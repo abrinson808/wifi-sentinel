@@ -3,6 +3,8 @@
 import nmap
 import json
 import os
+import time
+import urllib.request
 from datetime import datetime
 from config import NETWORK_RANGE, LOG_FILE, WHITELIST_FILE
 from notifier import alert_unknown_device
@@ -29,6 +31,23 @@ def log_event(message):
     print(entry)
     with open(LOG_FILE, "a") as f:
         f.write(entry + "\n")
+
+def lookup_vendor(mac):
+    """Look up the manufacturer of a device by its MAC address"""
+    if mac == "UNKNOWN":
+        return "Unknown"
+    try:
+        import ssl
+        import certifi
+        url = f"https://api.macvendors.com/{mac}"
+        ctx = ssl.create_default_context(cafile=certifi.where())
+        req = urllib.request.Request(url, headers={"User-Agent": "wifi-sentinel"})
+        with urllib.request.urlopen(req, timeout=5, context=ctx) as response:
+            vendor = response.read().decode("utf-8").strip()
+            time.sleep(1)
+            return vendor
+    except Exception:
+        return "Unknown"
 
 
 def scan_network():
@@ -87,12 +106,14 @@ def run_scan():
 
     if unknown:
         for mac, info in unknown.items():
-            message = f"⚠️  UNKNOWN DEVICE — IP: {info['ip']} | MAC: {mac} | Hostname: {info['hostname']}"
+            vendor = lookup_vendor(mac)
+            message = f"⚠️  UNKNOWN DEVICE — IP: {info['ip']} | MAC: {mac} | Vendor: {vendor} | Hostname: {info['hostname']}"
             log_event(message)
             alert_unknown_device(
                 mac=mac,
                 ip=info['ip'],
-                hostname=info['hostname']
+                hostname=info['hostname'],
+                vendor=vendor
             )
         return unknown
     else:
@@ -102,11 +123,4 @@ def run_scan():
 
 
 if __name__ == "__main__":
-    # Temporary test — simulates an unknown device alert
-    print("🧪 Testing unknown device alert...")
-    alert_unknown_device(
-        mac="AA:BB:CC:DD:EE:FF",
-        ip="10.0.0.99",
-        hostname="Unknown",
-        vendor="Test Device"
-    )
+    run_scan()
