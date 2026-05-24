@@ -1,0 +1,11 @@
+venv/
+
+config.py
+scan_log.txt
+whitelist.json
+
+__pycache__/
+*.pyc
+*.pyo
+
+.DS_Store

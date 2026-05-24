@@ -17,7 +17,7 @@ def start_scheduler():
     try:
         while True:
             schedule.run_pending()
-            time.sleep(180)
+            time.sleep(30)
     except KeyboardInterrupt:
         print("\n👋 WiFi Sentinel stopped. Stay safe out there!")
 

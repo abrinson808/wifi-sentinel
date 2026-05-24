@@ -5,10 +5,32 @@ import json
 import os
 import time
 import urllib.request
+import platform
+import sys
 from datetime import datetime
 from config import NETWORK_RANGE, LOG_FILE, WHITELIST_FILE
 from notifier import alert_unknown_device
 
+def check_system():
+    """Detect OS and warn if requirements aren't met"""
+    os_name = platform.system()
+    
+    if os_name == "Windows":
+        import ctypes
+        is_admin = ctypes.windll.shell32.IsUserAnAdmin()
+        if not is_admin:
+            print("⚠️  WiFi Sentinel requires administrator privileges on Windows.")
+            print("   Right-click your terminal and select 'Run as administrator'")
+            sys.exit(1)
+    
+    elif os_name in ("Darwin", "Linux"):
+        if os.geteuid() != 0:
+            print("⚠️  WiFi Sentinel requires sudo on Mac/Linux.")
+            print("   Run with: sudo venv/bin/python scanner.py")
+            sys.exit(1)
+    
+    print(f"✅ Running on {os_name}")
+    return os_name
 
 def load_whitelist():
     if not os.path.exists(WHITELIST_FILE):
@@ -95,6 +117,7 @@ def build_whitelist_from_scan():
 
 
 def run_scan():
+    check_system()
     whitelist = load_whitelist()
 
     if not whitelist:

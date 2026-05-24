@@ -1,5 +1,6 @@
-# notifier.py — handles desktop and SMS alerts
+# notifier.py — cross-platform desktop and SMS alerts
 
+import platform
 from config import (
     ENABLE_DESKTOP,
     ENABLE_SMS,
@@ -11,12 +12,17 @@ from config import (
 
 
 def send_desktop_notification(title, message):
-    """Send a Mac desktop notification"""
+    """Send a desktop notification — works on Mac, Windows, and Linux"""
     if not ENABLE_DESKTOP:
         return
     try:
-        import pync
-        pync.notify(message, title=title, sound="Funk")
+        from plyer import notification
+        notification.notify(
+            title=title,
+            message=message,
+            app_name="WiFi Sentinel",
+            timeout=10
+        )
         print("🔔 Desktop notification sent!")
     except Exception as e:
         print(f"⚠️  Desktop notification failed: {e}")
@@ -42,7 +48,8 @@ def send_sms(message):
 
 def alert_unknown_device(mac, ip, hostname, vendor="Unknown"):
     """Fire all enabled alerts for an unknown device"""
-    title = "⚠️ WiFi Sentinel Alert"
+    os_name = platform.system()
+    title = "WiFi Sentinel Alert"
     message = (
         f"Unknown device on your network!\n"
         f"IP: {ip}\n"
@@ -51,12 +58,15 @@ def alert_unknown_device(mac, ip, hostname, vendor="Unknown"):
         f"Hostname: {hostname}"
     )
     send_desktop_notification(title, message)
-    send_sms(f"WiFi Sentinel: Unknown device detected! IP: {ip} | MAC: {mac} | Vendor: {vendor}")
+    send_sms(
+        f"WiFi Sentinel: Unknown device! "
+        f"IP: {ip} | MAC: {mac} | Vendor: {vendor}"
+    )
+    print(f"[{os_name}] Alert fired for {ip}")
 
 
 if __name__ == "__main__":
-    # Test the notifier directly
-    print("🧪 Testing notifications...")
+    print("🧪 Testing cross-platform notification...")
     alert_unknown_device(
         mac="AA:BB:CC:DD:EE:FF",
         ip="10.0.0.99",
