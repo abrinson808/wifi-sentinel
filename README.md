@@ -14,6 +14,8 @@ my home network and realizing I had no way of knowing when new devices connected
 - 📋 Maintains a whitelist of trusted devices
 - 🔔 Cross-platform desktop notifications (macOS, Windows, Linux)
 - 🏭 Automatic MAC vendor lookup to identify device manufacturers
+- 🧑‍💻 Interactive mode to review and name unknown devices on the spot
+- 🚩 Flags unrecognized devices to a separate log for review
 - 📝 Logs all scan activity with timestamps
 - ⏰ Runs automatically in the background on a configurable schedule
 - 🛠️ Setup wizard that works on any OS
@@ -140,53 +142,78 @@ venv\Scripts\python scheduler.py
 
 ## First Run
 
-On first run, WiFi Sentinel will automatically scan your network and build
-a whitelist of all currently connected devices. Any new device that appears
-on subsequent scans will trigger an alert including the device's IP address,
-MAC address, and manufacturer name.
+On first run, WiFi Sentinel will automatically scan your network and walk
+you through building your whitelist device by device. For each device found
+you will be asked:
 
-### Adding new devices to your whitelist
+1. Whether you recognize the device
+2. To confirm or correct the vendor name
+3. To give the device a name (ex: iPhone, PS5, Smart TV)
 
-If a trusted device triggers an alert, you can add it to your whitelist
-by running:
+Any device you don't recognize is automatically saved to `flagged_devices.json`
+for review. Devices you recognize are saved to your whitelist as trusted.
+Press Enter on any field you don't know to skip it.
+
+### Running in interactive mode
+
+Interactive mode is recommended for day to day use. It scans your network and
+prompts you to review any unknown devices directly from the terminal.
 
 **macOS/Linux:**
 
 ```bash
-sudo venv/bin/python -c "
-import json
-with open('whitelist.json', 'r') as f:
-    wl = json.load(f)
-wl['XX:XX:XX:XX:XX:XX'] = {'ip': '10.0.0.X', 'hostname': 'Unknown', 'last_seen': 'now'}
-with open('whitelist.json', 'w') as f:
-    json.dump(wl, f, indent=4)
-print('Device added!')
-"
+sudo venv/bin/python scanner.py --interactive
 ```
 
 **Windows (Command Prompt as Administrator):**
 
 ```bash
-python -c "import json; wl=json.load(open('whitelist.json')); wl['XX:XX:XX:XX:XX:XX']={'ip':'10.0.0.X','hostname':'Unknown','last_seen':'now'}; json.dump(wl,open('whitelist.json','w'),indent=4); print('Device added!')"
+venv\Scripts\python scanner.py --interactive
 ```
 
-Replace `XX:XX:XX:XX:XX:XX` with the device's MAC address and `10.0.0.X`
-with its IP address from the alert.
+### Unknown device flow
+
+When an unknown device is detected in interactive mode, WiFi Sentinel will:
+
+1. Display the device's IP, MAC address, and vendor name
+2. Ask if you recognize the device
+3. If yes — let you confirm the vendor name and enter a device name
+4. If no — flag it to flagged_devices.json and keep alerting on future scans
+5. Any input other than 'y' defaults to flagging the device as unrecognized
+
+### Silent scheduled mode
+
+To run WiFi Sentinel silently in the background on a schedule:
+
+**macOS/Linux:**
+
+```bash
+sudo venv/bin/python scheduler.py
+```
+
+**Windows (Command Prompt as Administrator):**
+
+```bash
+venv\Scripts\python scheduler.py
+```
 
 ---
 
 ## Project Structure
 
-wifi-sentinel/  
-├── scanner.py # core scanning logic + vendor lookup
-├── notifier.py # cross-platform desktop alerts
-├── scheduler.py # automatic scheduling
-├── setup.py # first-run setup wizard
-├── whitelist.json # trusted devices (gitignored)
-├── scan_log.txt # scan history (gitignored)
-├── config.py # your settings (gitignored)
-├── config.example.py # safe template for config
+```
+wifi-sentinel/
+├── scanner.py              # core scanning, vendor lookup, interactive flow
+├── notifier.py             # cross-platform desktop alerts
+├── scheduler.py            # automatic scheduling
+├── setup.py                # first-run setup wizard
+├── whitelist.json          # trusted devices (gitignored)
+├── flagged_devices.json    # unrecognized devices log (gitignored)
+├── scan_log.txt            # scan history (gitignored)
+├── config.py               # your settings (gitignored)
+├── config.example.py       # safe template for config
 └── README.md
+```
 
 ---
 
@@ -194,7 +221,9 @@ wifi-sentinel/
 
 - [x] Cross-platform support (macOS, Windows, Linux)
 - [x] MAC vendor lookup
-- [ ] Web dashboard to view scan history
+- [x] Interactive whitelist management
+- [x] Flagged devices log
+- [ ] Web dashboard to view scan history and whitelist
 - [ ] Auto-launch on startup
 - [ ] Email alerts via Gmail SMTP
 
