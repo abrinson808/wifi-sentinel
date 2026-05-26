@@ -124,7 +124,7 @@ def print_next_steps():
     elif OS == "Windows":
         print("   1. Open config.py and set your NETWORK_RANGE")
         print("      Run: ipconfig in Command Prompt to find your IP")
-        print("   2. Open terminal as Administrator and run:")
+        print("   2. Open Command Prompt as Administrator and run:")
         print("      venv\\Scripts\\python scanner.py")
         print("   3. Run on a schedule:")
         print("      venv\\Scripts\\python scheduler.py")

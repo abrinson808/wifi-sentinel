@@ -145,11 +145,39 @@ a whitelist of all currently connected devices. Any new device that appears
 on subsequent scans will trigger an alert including the device's IP address,
 MAC address, and manufacturer name.
 
+### Adding new devices to your whitelist
+
+If a trusted device triggers an alert, you can add it to your whitelist
+by running:
+
+**macOS/Linux:**
+
+```bash
+sudo venv/bin/python -c "
+import json
+with open('whitelist.json', 'r') as f:
+    wl = json.load(f)
+wl['XX:XX:XX:XX:XX:XX'] = {'ip': '10.0.0.X', 'hostname': 'Unknown', 'last_seen': 'now'}
+with open('whitelist.json', 'w') as f:
+    json.dump(wl, f, indent=4)
+print('Device added!')
+"
+```
+
+**Windows (Command Prompt as Administrator):**
+
+```bash
+python -c "import json; wl=json.load(open('whitelist.json')); wl['XX:XX:XX:XX:XX:XX']={'ip':'10.0.0.X','hostname':'Unknown','last_seen':'now'}; json.dump(wl,open('whitelist.json','w'),indent=4); print('Device added!')"
+```
+
+Replace `XX:XX:XX:XX:XX:XX` with the device's MAC address and `10.0.0.X`
+with its IP address from the alert.
+
 ---
 
 ## Project Structure
 
-wifi-sentinel/
+wifi-sentinel/  
 ├── scanner.py # core scanning logic + vendor lookup
 ├── notifier.py # cross-platform desktop alerts
 ├── scheduler.py # automatic scheduling
