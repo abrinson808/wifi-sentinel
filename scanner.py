@@ -7,6 +7,7 @@ import time
 import urllib.request
 import platform
 import sys
+import argparse
 from datetime import datetime
 from config import NETWORK_RANGE, LOG_FILE, WHITELIST_FILE
 from notifier import alert_unknown_device
@@ -46,6 +47,28 @@ def save_whitelist(whitelist):
     with open(WHITELIST_FILE, "w") as f:
         json.dump(whitelist, f, indent=4)
 
+def flag_device(mac, info):
+    """Save an unrecognized device to the flagged devices log"""
+    if not os.path.exists("flagged_devices.json"):
+        flagged = {}
+    else:
+        with open("flagged_devices.json", "r") as f:
+            content = f.read().strip()
+            flagged = json.loads(content) if content and content != "{}" else {}
+
+    flagged[mac] = {
+        "ip": info.get("ip", "Unknown"),
+        "vendor": info.get("vendor", "Unknown"),
+        "hostname": info.get("hostname", "Unknown"),
+        "flagged_at": datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+    }
+
+    with open("flagged_devices.json", "w") as f:
+        json.dump(flagged, f, indent=4)
+
+    log_event(f"🚩 Device flagged as unrecognized: {mac} | {info.get('ip')} | {info.get('vendor', 'Unknown')}")
+    print("  🚩 Flagged as unrecognized\n")
+
 
 def log_event(message):
     timestamp = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
@@ -55,9 +78,16 @@ def log_event(message):
         f.write(entry + "\n")
 
 def lookup_vendor(mac):
-    """Look up the manufacturer of a device by its MAC address"""
+    """Look up the manufacturer of a device by its MAC address, with caching"""
     if mac == "UNKNOWN":
         return "Unknown"
+
+    # Check whitelist cache first
+    whitelist = load_whitelist()
+    if mac in whitelist and whitelist[mac].get("vendor"):
+        return whitelist[mac]["vendor"]
+
+    # Otherwise hit the API
     try:
         import ssl
         import certifi
@@ -97,8 +127,40 @@ def check_for_intruders(devices, whitelist):
             unknown[mac] = info
     return unknown
 
+def interactive_review(unknown):
+    """Prompt the user to add unknown devices to the whitelist"""
+    if not unknown:
+        return
+
+    whitelist = load_whitelist()
+    print("\n📋 Unknown devices found — review each one:\n")
+
+    for mac, info in unknown.items():
+        print(f"  IP:          {info['ip']}")
+        print(f"  MAC:         {mac}")
+        print(f"  Vendor:      {info.get('vendor', 'Unknown')}")
+
+        response = input("\n  Do you recognize this device? (y/n): ").strip().lower()
+
+        if response == "y":
+            current_vendor = info.get("vendor", "Unknown")
+            custom_vendor = input(f"  Vendor name (press Enter to keep '{current_vendor}'): ").strip()
+            device_name = input(f"  Device name (ex: iPhone, PS5, Smart TV — press Enter to skip): ").strip()
+
+            if custom_vendor:
+                info["vendor"] = custom_vendor
+            if device_name:
+                info["device_name"] = device_name
+
+            whitelist[mac] = info
+            save_whitelist(whitelist)
+            log_event(f"Device added to whitelist: {mac} | {info['ip']} | {info.get('vendor', 'Unknown')} | {info.get('device_name', 'Unknown')}")
+            print("  ✅ Added!\n")
+        else:
+            flag_device(mac, info)
 
 def build_whitelist_from_scan():
+    """First-run setup — scan and approve all current devices as known"""
     print("\n🛠  First run detected — building your whitelist...\n")
     devices = scan_network()
 
@@ -108,13 +170,39 @@ def build_whitelist_from_scan():
 
     print(f"Found {len(devices)} device(s) on your network:\n")
     for mac, info in devices.items():
-        print(f"  IP: {info['ip']:<16} MAC: {mac:<20} Hostname: {info['hostname']}")
+        vendor = lookup_vendor(mac)
+        info["vendor"] = vendor
+        print(f"  IP: {info['ip']:<16} MAC: {mac:<20} Vendor: {vendor}")
 
-    print("\nAdding all current devices to your whitelist as trusted...")
-    save_whitelist(devices)
-    log_event(f"Whitelist created with {len(devices)} trusted devices.")
+    print("\n📋 Let's identify your devices before saving the whitelist.")
+    print("   Press Enter to skip any field you don't know.\n")
+
+    trusted = {}
+    for mac, info in devices.items():
+        print(f"  IP: {info['ip']:<16} MAC: {mac:<20} Vendor: {info.get('vendor', 'Unknown')}")
+
+        recognized = input("  Do you recognize this device? (y/n): ").strip().lower()
+
+        if recognized == "y":
+            current_vendor = info.get("vendor", "Unknown")
+            custom_vendor = input(f"  Vendor name (press Enter to keep '{current_vendor}'): ").strip()
+            device_name = input(f"  Device name (ex: iPhone, PS5, Smart TV — press Enter to skip): ").strip()
+
+            if custom_vendor:
+                info["vendor"] = custom_vendor
+            if device_name:
+                info["device_name"] = device_name
+
+            trusted[mac] = info
+        else:
+            flag_device(mac, info)
+
+        print()
+
+    print("Adding recognized devices to your whitelist...")
+    save_whitelist(trusted)
+    log_event(f"Whitelist created with {len(trusted)} trusted devices.")
     print("✅ Whitelist saved to whitelist.json\n")
-
 
 def run_scan():
     check_system()
@@ -146,4 +234,36 @@ def run_scan():
 
 
 if __name__ == "__main__":
-    run_scan()
+    parser = argparse.ArgumentParser(description="WiFi Sentinel — home network monitor")
+    parser.add_argument(
+        "--interactive",
+        action="store_true",
+        help="Prompt to add unknown devices to whitelist after scan"
+    )
+    args = parser.parse_args()
+
+    if args.interactive:
+        whitelist = load_whitelist()
+        if not whitelist:
+            build_whitelist_from_scan()
+        else:
+            devices = scan_network()
+            unknown = check_for_intruders(devices, whitelist)
+            if unknown:
+                for mac, info in unknown.items():
+                    vendor = lookup_vendor(mac)
+                    info["vendor"] = vendor
+                    message = f"⚠️  UNKNOWN DEVICE — IP: {info['ip']} | MAC: {mac} | Vendor: {vendor} | Hostname: {info['hostname']}"
+                    log_event(message)
+                alert_unknown_device(
+                    mac=mac,
+                    ip=info['ip'],
+                    hostname=info['hostname'],
+                    vendor=vendor
+                )
+                interactive_review(unknown)
+            else:
+                log_event(f"Scan complete. {len(devices)} device(s) found. All trusted.")
+                print("✅ All devices recognized. Network looks clean!\n")
+    else:
+        run_scan()

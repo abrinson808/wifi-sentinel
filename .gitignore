@@ -3,6 +3,7 @@ venv/
 config.py
 scan_log.txt
 whitelist.json
+flagged_devices.json
 
 __pycache__/
 *.pyc
