@@ -95,10 +95,11 @@ def flagged():
 @app.route("/settings")
 @login_required
 def settings():
+    from config import ENABLE_DESKTOP
     return render_template("settings.html",
         scan_interval=SCAN_INTERVAL,
         scheduler_running=scheduler_running,
-        notifications_enabled=True
+        notifications_enabled=ENABLE_DESKTOP
     )
 
 
@@ -271,6 +272,25 @@ def clear_flagged():
     """Clear all flagged devices"""
     save_json("flagged_devices.json", {})
     return jsonify({"status": "success"})
+
+@app.route("/api/notifications/toggle", methods=["POST"])
+@login_required
+def toggle_notifications():
+    """Toggle desktop notifications on or off in config.py"""
+    enabled = request.json.get("enabled")
+    try:
+        with open("config.py", "r") as f:
+            content = f.read()
+        lines = content.splitlines()
+        for i, line in enumerate(lines):
+            if line.startswith("ENABLE_DESKTOP"):
+                lines[i] = f"ENABLE_DESKTOP = {str(enabled)}"
+                break
+        with open("config.py", "w") as f:
+            f.write("\n".join(lines))
+        return jsonify({"status": "success", "enabled": enabled})
+    except Exception as e:
+        return jsonify({"status": "error", "message": str(e)})
 
 
 # ── Helpers ───────────────────────────────────────────────────────────────────

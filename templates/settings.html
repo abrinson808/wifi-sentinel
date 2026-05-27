@@ -1,95 +1,219 @@
-{% extends "base.html" %} {% block content %}
+{% extends "base.html" %}
+
+{% block content %}
 <div class="page-header">
   <h2>⚙️ Settings</h2>
   <p>Control your WiFi Sentinel from the dashboard</p>
 </div>
 
+<!-- Manual Scan Section -->
 <div class="settings-section">
   <h3>🔍 Manual Scan</h3>
   <p>Trigger a network scan right now</p>
-  <button onclick="triggerScan()" class="btn-primary">Run Scan Now</button>
+  <button onclick="triggerScan()" class="btn-primary" id="scan-btn">🔍 Scan Now</button>
+  <div class="progress-bar hidden" id="progress-bar">
+    <div class="progress-fill" id="progress-fill"></div>
+  </div>
   <p class="feedback" id="scan-feedback"></p>
 </div>
 
+<!-- Scan Results -->
+<div id="scan-results" class="hidden">
+  <div class="page-header">
+    <h3>⚠️ Unknown Devices Found</h3>
+  </div>
+  <table>
+    <thead>
+      <tr>
+        <th>IP Address</th>
+        <th>MAC Address</th>
+        <th>Vendor</th>
+        <th>Device Name</th>
+        <th>Actions</th>
+      </tr>
+    </thead>
+    <tbody id="results-table"></tbody>
+  </table>
+</div>
+
+<!-- Scheduler Section -->
 <div class="settings-section">
   <h3>⏰ Scheduler</h3>
-  <p>
-    Status:
-    <span id="scheduler-status"
-      >{{ 'Running' if scheduler_running else 'Stopped' }}</span
-    >
-  </p>
-  <button onclick="startScheduler()" class="btn-primary">
-    Start Scheduler
-  </button>
+  <p>Status: <span id="scheduler-status">{{ 'Running' if scheduler_running else 'Stopped' }}</span></p>
+  <button onclick="startScheduler()" class="btn-primary">Start Scheduler</button>
   <button onclick="stopScheduler()" class="btn-danger">Stop Scheduler</button>
-
   <div class="interval-control">
     <label>Scan interval (minutes):</label>
-    <input
-      type="number"
-      id="interval-input"
-      value="{{ scan_interval }}"
-      min="1"
-      max="60"
-    />
+    <input type="number" id="interval-input" value="{{ scan_interval }}" min="1" max="60">
     <button onclick="updateInterval()" class="btn-primary">Save</button>
     <p class="feedback" id="interval-feedback"></p>
   </div>
 </div>
 
+<!-- Notifications Section -->
 <div class="settings-section">
   <h3>🔔 Notifications</h3>
-  <p>
-    Desktop notifications are currently
-    <strong>{{ 'enabled' if notifications_enabled else 'disabled' }}</strong>
-  </p>
+  <p>Toggle desktop notifications on or off</p>
+  <div class="toggle-row">
+    <span>Desktop Notifications</span>
+    <label class="toggle-switch">
+      <input type="checkbox" id="notifications-toggle"
+        {{ 'checked' if notifications_enabled else '' }}
+        onchange="toggleNotifications(this.checked)">
+      <span class="toggle-slider"></span>
+    </label>
+  </div>
+  <p class="feedback" id="notifications-feedback"></p>
 </div>
 
 <script>
-  function triggerScan() {
-    fetch("/api/scan", { method: "POST" })
-      .then((r) => r.json())
-      .then((data) => {
-        document.getElementById("scan-feedback").textContent =
-          data.status === "success" ? "✅ Scan started!" : "⚠️ " + data.message;
-      });
-  }
+function triggerScan() {
+  const btn = document.getElementById("scan-btn");
+  const bar = document.getElementById("progress-bar");
+  const fill = document.getElementById("progress-fill");
+  const feedback = document.getElementById("scan-feedback");
+  const results = document.getElementById("scan-results");
 
-  function startScheduler() {
-    fetch("/api/scheduler/start", { method: "POST" })
-      .then((r) => r.json())
-      .then((data) => {
-        document.getElementById("scheduler-status").textContent = data.running
-          ? "Running"
-          : "Stopped";
-      });
-  }
+  btn.disabled = true;
+  btn.textContent = "Scanning...";
+  bar.classList.remove("hidden");
+  fill.style.width = "0%";
+  feedback.textContent = "";
+  results.classList.add("hidden");
 
-  function stopScheduler() {
-    fetch("/api/scheduler/stop", { method: "POST" })
-      .then((r) => r.json())
-      .then((data) => {
-        document.getElementById("scheduler-status").textContent = data.running
-          ? "Running"
-          : "Stopped";
-      });
-  }
+  let progress = 0;
+  const progressInterval = setInterval(() => {
+    progress += 1;
+    if (progress <= 90) fill.style.width = progress + "%";
+  }, 600);
 
-  function updateInterval() {
-    const interval = document.getElementById("interval-input").value;
-    fetch("/api/interval", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ interval: interval }),
-    })
-      .then((r) => r.json())
-      .then((data) => {
-        document.getElementById("interval-feedback").textContent =
-          data.status === "success"
-            ? "✅ Interval updated!"
-            : "⚠️ " + data.message;
-      });
-  }
+  fetch("/api/scan", { method: "POST" })
+    .then(r => r.json())
+    .then(data => {
+      if (data.status !== "success") {
+        clearInterval(progressInterval);
+        bar.classList.add("hidden");
+        btn.disabled = false;
+        btn.textContent = "🔍 Scan Now";
+        feedback.textContent = "⚠️ " + data.message;
+        return;
+      }
+      const pollInterval = setInterval(() => {
+        fetch("/api/scan/status")
+          .then(r => r.json())
+          .then(status => {
+            if (!status.in_progress) {
+              clearInterval(pollInterval);
+              clearInterval(progressInterval);
+              fill.style.width = "100%";
+              setTimeout(() => {
+                bar.classList.add("hidden");
+                btn.disabled = false;
+                btn.textContent = "🔍 Scan Now";
+                if (status.unknown && status.unknown.length > 0) {
+                  feedback.textContent = `⚠️ ${status.unknown.length} unknown device(s) found!`;
+                  showResults(status.unknown);
+                } else {
+                  feedback.textContent = "✅ Scan complete! All devices recognized.";
+                }
+              }, 500);
+            }
+          });
+      }, 2000);
+    });
+}
+
+function showResults(unknown) {
+  const tbody = document.getElementById("results-table");
+  const results = document.getElementById("scan-results");
+  tbody.innerHTML = "";
+
+  unknown.forEach(device => {
+    const row = document.createElement("tr");
+    row.id = "result-" + device.mac.replace(/:/g, "-");
+    row.innerHTML = `
+      <td>${device.ip}</td>
+      <td>${device.mac}</td>
+      <td><input type="text" value="${device.vendor}"
+        id="vendor-${device.mac.replace(/:/g, "-")}"></td>
+      <td><input type="text" placeholder="Device name"
+        id="name-${device.mac.replace(/:/g, "-")}"></td>
+      <td>
+        <button onclick="addToWhitelist('${device.mac}', '${device.ip}', '${device.hostname}')"
+          class="btn-small btn-primary">Add to Whitelist</button>
+      </td>
+    `;
+    tbody.appendChild(row);
+  });
+
+  results.classList.remove("hidden");
+}
+
+function addToWhitelist(mac, ip, hostname) {
+  const safeMac = mac.replace(/:/g, "-");
+  const vendor = document.getElementById("vendor-" + safeMac).value;
+  const device_name = document.getElementById("name-" + safeMac).value;
+
+  fetch("/api/whitelist/add", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ mac, ip, hostname, vendor, device_name })
+  })
+    .then(r => r.json())
+    .then(data => {
+      if (data.status === "success") {
+        document.getElementById("result-" + safeMac).remove();
+        const feedback = document.getElementById("scan-feedback");
+        feedback.textContent = "✅ Device added to whitelist!";
+      }
+    });
+}
+
+function startScheduler() {
+  fetch("/api/scheduler/start", { method: "POST" })
+    .then(r => r.json())
+    .then(data => {
+      document.getElementById("scheduler-status").textContent =
+        data.running ? "Running" : "Stopped";
+    });
+}
+
+function stopScheduler() {
+  fetch("/api/scheduler/stop", { method: "POST" })
+    .then(r => r.json())
+    .then(data => {
+      document.getElementById("scheduler-status").textContent =
+        data.running ? "Running" : "Stopped";
+    });
+}
+
+function updateInterval() {
+  const interval = document.getElementById("interval-input").value;
+  fetch("/api/interval", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ interval: interval })
+  })
+    .then(r => r.json())
+    .then(data => {
+      document.getElementById("interval-feedback").textContent =
+        data.status === "success" ? "✅ Interval updated!" : "⚠️ " + data.message;
+    });
+}
+
+function toggleNotifications(enabled) {
+  fetch("/api/notifications/toggle", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ enabled: enabled })
+  })
+    .then(r => r.json())
+    .then(data => {
+      document.getElementById("notifications-feedback").textContent =
+        data.status === "success"
+          ? `✅ Notifications ${enabled ? "enabled" : "disabled"}`
+          : "⚠️ " + data.message;
+    });
+}
 </script>
 {% endblock %}

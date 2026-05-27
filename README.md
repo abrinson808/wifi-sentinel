@@ -15,10 +15,12 @@ my home network and realizing I had no way of knowing when new devices connected
 - 🔔 Cross-platform desktop notifications (macOS, Windows, Linux)
 - 🏭 Automatic MAC vendor lookup to identify device manufacturers
 - 🧑‍💻 Interactive mode to review and name unknown devices on the spot
-- 🚩 Flags unrecognized devices to a separate log for review
+- ⛳ Flags unrecognized devices to a separate log for review
 - 📝 Logs all scan activity with timestamps
 - ⏰ Runs automatically in the background on a configurable schedule
 - 🛠️ Setup wizard that works on any OS
+- 🌐 Web dashboard to monitor and manage your network from a browser
+- ⚙️ Dashboard settings to control scheduler, scan interval, and notifications
 
 ---
 
@@ -124,18 +126,36 @@ ip addr
 # Manual scan
 sudo venv/bin/python scanner.py
 
+# Interactive mode (recommended)
+sudo venv/bin/python scanner.py --interactive
+
 # Run on a schedule
 sudo venv/bin/python scheduler.py
+
+# Launch the web dashboard (user friendly)
+venv/bin/python dashboard.py
 ```
 
-**Windows (run as Administrator):**
+**Windows (Command Prompt as Administrator):**
 
 ```bash
 # Manual scan
 venv\Scripts\python scanner.py
 
+# Interactive mode (recommended)
+venv\Scripts\python scanner.py --interactive
+
 # Run on a schedule
 venv\Scripts\python scheduler.py
+
+# Launch the web dashboard (user friendly)
+venv\Scripts\python dashboard.py
+```
+
+Then open your browser and go to:
+
+```
+http://localhost:5001
 ```
 
 ---
@@ -206,7 +226,16 @@ wifi-sentinel/
 ├── scanner.py              # core scanning, vendor lookup, interactive flow
 ├── notifier.py             # cross-platform desktop alerts
 ├── scheduler.py            # automatic scheduling
+├── dashboard.py            # Flask web dashboard
 ├── setup.py                # first-run setup wizard
+├── templates/              # HTML templates for dashboard
+│   ├── base.html           # shared nav and layout
+│   ├── login.html          # password login page
+│   ├── network.html        # live network and scan controls
+│   ├── history.html        # scan history log
+│   ├── flagged.html        # flagged devices
+│   └── settings.html       # scheduler, notifications, manual scan
+├── static/css/style.css    # dashboard stylesheet
 ├── whitelist.json          # trusted devices (gitignored)
 ├── flagged_devices.json    # unrecognized devices log (gitignored)
 ├── scan_log.txt            # scan history (gitignored)
@@ -223,7 +252,8 @@ wifi-sentinel/
 - [x] MAC vendor lookup
 - [x] Interactive whitelist management
 - [x] Flagged devices log
-- [ ] Web dashboard to view scan history and whitelist
+- [x] Web dashboard with live network, history, and flagged devices
+- [x] Dashboard settings with scheduler controls and notification toggle
 - [ ] Auto-launch on startup
 - [ ] Email alerts via Gmail SMTP
 
