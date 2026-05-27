@@ -6,7 +6,9 @@
 
 <div class="log-container">
   {% if logs %} {% for line in logs %}
-  <div class="log-entry {{ 'log-alert' if '⚠️' in line else 'log-clean' }}">
+  <div
+    class="log-entry {{ 'log-alert' if '⚠️' in line else 'log-whitelisted' if 'added to whitelist' in line else 'log-clean' }}"
+  >
     {{ line }}
   </div>
   {% endfor %} {% else %}

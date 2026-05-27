@@ -292,6 +292,8 @@ def add_to_whitelist():
         "last_seen": datetime.now().strftime("%Y-%m-%d %H:%M:%S")
     }
     save_json(WHITELIST_FILE, whitelist)
+    from scanner import log_event
+    log_event(f"Device added to whitelist: {mac} | {ip} | {vendor} | {device_name}")
     return jsonify({"status": "success"})
 
 @app.route("/api/flagged/clear", methods=["POST"])

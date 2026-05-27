@@ -294,7 +294,8 @@ tr:hover td {
 .log-container {
   background: var(--surface);
   border-radius: var(--radius);
-  overflow: hidden;
+  overflow-y: auto;
+  max-height: 600px;
   font-size: 13px;
   font-family: "SF Mono", "Fira Code", monospace;
 }
@@ -310,6 +311,10 @@ tr:hover td {
 
 .log-clean {
   border-left: 3px solid var(--success);
+}
+
+.log-whitelisted {
+  border-left: 3px solid var(--accent);
 }
 
 /* ── Modal ───────────────────────────────────────────────────────────────── */
@@ -369,13 +374,12 @@ tr:hover td {
 
 /* ── Login ───────────────────────────────────────────────────────────────── */
 .login-container {
-  max-width: 380px;
-  margin: 100px auto;
   background: var(--surface);
-  border: 1px solid var(--border);
   border-radius: var(--radius);
-  padding: 40px;
-  text-align: center;
+  overflow-y: auto;
+  max-height: 600px;
+  font-size: 13px;
+  font-family: "SF Mono", "Fira Code", monospace;
 }
 
 .login-container h1 {
