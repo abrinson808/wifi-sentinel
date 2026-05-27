@@ -1,0 +1,16 @@
+[
+    {
+        "ip": "10.0.0.213",
+        "hostname": "Unknown",
+        "last_seen": "2026-05-27 12:07:19",
+        "mac": "FC:B4:67:B3:5D:EC",
+        "vendor": "Espressif Inc."
+    },
+    {
+        "ip": "10.0.0.59",
+        "hostname": "Unknown",
+        "last_seen": "2026-05-27 12:07:19",
+        "mac": "94:EA:32:76:6F:B6",
+        "vendor": "Apple, Inc."
+    }
+]
