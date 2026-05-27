@@ -162,9 +162,16 @@ function addToWhitelist(mac, ip, hostname) {
     .then(r => r.json())
     .then(data => {
       if (data.status === "success") {
-        document.getElementById("result-" + safeMac).remove();
-        const feedback = document.getElementById("scan-feedback");
-        feedback.textContent = "✅ Device added to whitelist!";
+        // Remove just this row instead of reloading the page
+        const row = document.getElementById("result-" + safeMac);
+        row.innerHTML = `<td colspan="5" style="color: var(--success)">✅ ${vendor || mac} added to whitelist!</td>`;
+        setTimeout(() => row.remove(), 2000);
+
+        // If no more results rows reload to update the network table
+        const remaining = document.querySelectorAll("#results-table tr").length;
+        if (remaining <= 1) {
+          setTimeout(() => location.reload(), 2100);
+        }
       }
     });
 }

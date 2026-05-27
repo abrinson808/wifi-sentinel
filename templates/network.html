@@ -4,7 +4,7 @@
 <div class="status-strip">
   <div class="status-item">
     <span class="status-label">Devices</span>
-    <span class="status-value">{{ devices|length }}</span>
+    <span class="status-value" id="device-count">{{ devices|length }}</span>
   </div>
   <div class="status-item">
     <span class="status-label">Scheduler</span>
@@ -14,7 +14,7 @@
   </div>
   <div class="status-item">
     <span class="status-label">Last Scan</span>
-    <span class="status-value">{{ last_scan }}</span>
+    <span class="status-value" id="last-scan">{{ last_scan }}</span>
   </div>
 </div>
 
@@ -24,7 +24,6 @@
   <p>All trusted devices on your network</p>
 </div>
 
-{% if devices %}
 <table>
   <thead>
     <tr>
@@ -62,7 +61,8 @@
     {% endfor %}
   </tbody>
 </table>
-{% else %}
+
+{% if not devices %}
 <p class="empty-state">No devices yet — run a scan below to get started</p>
 {% endif %}
 
@@ -166,6 +166,11 @@
                     feedback.textContent =
                       "✅ Scan complete! All devices recognized.";
                   }
+                  // Update last scan time
+                  const now = new Date();
+                  const pad = (n) => String(n).padStart(2, "0");
+                  const timestamp = `${now.getFullYear()}-${pad(now.getMonth() + 1)}-${pad(now.getDate())} ${pad(now.getHours())}:${pad(now.getMinutes())}:${pad(now.getSeconds())}`;
+                  document.getElementById("last-scan").textContent = timestamp;
                 }, 500);
               }
             });
@@ -210,8 +215,36 @@
       .then((r) => r.json())
       .then((data) => {
         if (data.status === "success") {
-          document.getElementById("result-" + safeMac).remove();
-          location.reload();
+          // Update results row
+          const row = document.getElementById("result-" + safeMac);
+          row.innerHTML = `<td colspan="5" style="color: var(--success)">✅ ${vendor || mac} added to whitelist!</td>`;
+          setTimeout(() => row.remove(), 2000);
+
+          // Add to network table immediately
+          const tbody = document.getElementById("device-table");
+          const emptyState = document.querySelector(".empty-state");
+          if (emptyState) emptyState.remove();
+
+          const newRow = document.createElement("tr");
+          newRow.id = "row-" + safeMac;
+          newRow.innerHTML = `
+          <td>${ip}</td>
+          <td>${mac}</td>
+          <td class="vendor-cell">${vendor || "Unknown"}</td>
+          <td class="name-cell">${device_name || "Unknown"}</td>
+          <td>Just now</td>
+          <td class="actions">
+            <button onclick="editDevice('${mac}')" class="btn-small">✏️</button>
+            <button onclick="flagDevice('${mac}')" class="btn-small btn-warn">⛳</button>
+            <button onclick="removeDevice('${mac}')" class="btn-small btn-danger">🗑️</button>
+          </td>
+        `;
+          tbody.appendChild(newRow);
+
+          // Update device count
+          const countEl = document.getElementById("device-count");
+          if (countEl)
+            countEl.textContent = parseInt(countEl.textContent || 0) + 1;
         }
       });
   }
@@ -277,4 +310,5 @@
     }
   }
 </script>
+
 {% endblock %}

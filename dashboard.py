@@ -125,23 +125,51 @@ def run_scan_thread():
     global scan_in_progress, scan_results_cache
     try:
         from scanner import scan_network, check_for_intruders, load_whitelist, lookup_vendor, log_event
-        devices = scan_network()
-        whitelist = load_whitelist()
-        unknown_macs = check_for_intruders(devices, whitelist)
-        unknown = []
-        for mac, info in unknown_macs.items():
-            vendor = lookup_vendor(mac)
-            info["vendor"] = vendor
-            info["mac"] = mac
-            unknown.append(info)
-        if unknown:
-            for device in unknown:
-                log_event(f"⚠️  UNKNOWN DEVICE — IP: {device['ip']} | MAC: {device['mac']} | Vendor: {device['vendor']}")
-        else:
-            log_event(f"Scan complete. {len(devices)} device(s) found. All trusted.")
-        scan_results_cache = unknown
+        from config import SUDO_PASSWORD
+        import subprocess
+
+        # Run nmap via sudo subprocess so we get full scan results
+        result = subprocess.run(
+            ["sudo", "-S", "venv/bin/python", "-c",
+             "from scanner import scan_network, check_for_intruders, load_whitelist, lookup_vendor, log_event; "
+             "import json; "
+             "devices = scan_network(); "
+             "whitelist = load_whitelist(); "
+             "unknown = {mac: {**info, 'mac': mac, 'vendor': lookup_vendor(mac)} for mac, info in check_for_intruders(devices, whitelist).items()}; "
+             "print(json.dumps({'devices': devices, 'unknown': list(unknown.values())}))"],
+            input=f"{SUDO_PASSWORD}\n",
+            capture_output=True,
+            text=True,
+            timeout=120
+        )
+
+        if result.returncode != 0:
+            print(f"Scan stderr: {result.stderr}")
+            scan_results_cache = []
+            return
+
+        output = result.stdout.strip()
+        # Find the JSON line in output
+        for line in output.splitlines():
+            if line.startswith("{"):
+                data = json.loads(line)
+                unknown = data.get("unknown", [])
+                devices = data.get("devices", {})
+
+                if unknown:
+                    for device in unknown:
+                        log_event(f"⚠️  UNKNOWN DEVICE — IP: {device['ip']} | MAC: {device['mac']} | Vendor: {device['vendor']}")
+                else:
+                    log_event(f"Scan complete. {len(devices)} device(s) found. All trusted.")
+
+                scan_results_cache = unknown
+                break
+
     except Exception as e:
+        import traceback
         print(f"Scan error: {e}")
+        traceback.print_exc()
+        scan_results_cache = []
     finally:
         scan_in_progress = False
 
