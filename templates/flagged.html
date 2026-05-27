@@ -1,0 +1,46 @@
+{% extends "base.html" %} {% block content %}
+<div class="page-header">
+  <h2>⛳ Flagged Devices</h2>
+  <p>Devices you did not recognize during a scan</p>
+</div>
+
+{% if devices %}
+<button onclick="clearFlagged()" class="btn-danger">Clear All Flagged</button>
+
+<table>
+  <thead>
+    <tr>
+      <th>IP Address</th>
+      <th>MAC Address</th>
+      <th>Vendor</th>
+      <th>Flagged At</th>
+    </tr>
+  </thead>
+  <tbody>
+    {% for mac, info in devices.items() %}
+    <tr>
+      <td>{{ info.ip }}</td>
+      <td>{{ mac }}</td>
+      <td>{{ info.vendor }}</td>
+      <td>{{ info.flagged_at }}</td>
+    </tr>
+    {% endfor %}
+  </tbody>
+</table>
+
+{% else %}
+<p class="empty-state">No flagged devices. Your network looks clean!</p>
+{% endif %}
+
+<script>
+  function clearFlagged() {
+    if (confirm("Clear all flagged devices?")) {
+      fetch("/api/flagged/clear", { method: "POST" })
+        .then((r) => r.json())
+        .then((data) => {
+          if (data.status === "success") location.reload();
+        });
+    }
+  }
+</script>
+{% endblock %}

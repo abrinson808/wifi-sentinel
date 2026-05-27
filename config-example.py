@@ -13,3 +13,8 @@ ENABLE_DESKTOP = True
 
 LOG_FILE = "scan_log.txt"
 WHITELIST_FILE = "whitelist.json"
+
+# Dashboard settings
+DASHBOARD_PASSWORD = "your_password_here"
+DASHBOARD_SECRET_KEY = "change_this_to_a_random_string"
+SUDO_PASSWORD = "your_mac_login_password_here"

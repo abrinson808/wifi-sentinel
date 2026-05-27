@@ -1,0 +1,280 @@
+{% extends "base.html" %} {% block content %}
+
+<!-- Status Strip -->
+<div class="status-strip">
+  <div class="status-item">
+    <span class="status-label">Devices</span>
+    <span class="status-value">{{ devices|length }}</span>
+  </div>
+  <div class="status-item">
+    <span class="status-label">Scheduler</span>
+    <span class="status-value"
+      >{{ 'Running' if scheduler_running else 'Stopped' }}</span
+    >
+  </div>
+  <div class="status-item">
+    <span class="status-label">Last Scan</span>
+    <span class="status-value">{{ last_scan }}</span>
+  </div>
+</div>
+
+<!-- Live Network Table -->
+<div class="page-header">
+  <h2>🔍 Live Network</h2>
+  <p>All trusted devices on your network</p>
+</div>
+
+{% if devices %}
+<table>
+  <thead>
+    <tr>
+      <th>IP Address</th>
+      <th>MAC Address</th>
+      <th>Vendor</th>
+      <th>Device Name</th>
+      <th>Last Seen</th>
+      <th>Actions</th>
+    </tr>
+  </thead>
+  <tbody id="device-table">
+    {% for mac, info in devices.items() %}
+    <tr id="row-{{ mac | replace(':', '-') }}">
+      <td>{{ info.ip }}</td>
+      <td>{{ mac }}</td>
+      <td class="vendor-cell">{{ info.vendor }}</td>
+      <td class="name-cell">
+        {{ info.device_name if info.device_name else 'Unknown' }}
+      </td>
+      <td>{{ info.last_seen }}</td>
+      <td class="actions">
+        <button onclick="editDevice('{{ mac }}')" class="btn-small">✏️</button>
+        <button onclick="flagDevice('{{ mac }}')" class="btn-small btn-warn">
+          ⛳
+        </button>
+        <button
+          onclick="removeDevice('{{ mac }}')"
+          class="btn-small btn-danger"
+        >
+          🗑️
+        </button>
+      </td>
+    </tr>
+    {% endfor %}
+  </tbody>
+</table>
+{% else %}
+<p class="empty-state">No devices yet — run a scan below to get started</p>
+{% endif %}
+
+<!-- Edit Device Modal -->
+<div id="edit-modal" class="modal hidden">
+  <div class="modal-content">
+    <h3>✏️ Edit Device</h3>
+    <input type="hidden" id="edit-mac" />
+    <label>Vendor</label>
+    <input type="text" id="edit-vendor" placeholder="Vendor name" />
+    <label>Device Name</label>
+    <input type="text" id="edit-device-name" placeholder="Device name" />
+    <div class="modal-actions">
+      <button onclick="saveEdit()" class="btn-primary">Save</button>
+      <button onclick="closeModal()" class="btn-secondary">Cancel</button>
+    </div>
+  </div>
+</div>
+
+<!-- Scan Network Section -->
+<div class="page-header">
+  <h2>📡 Scan Network</h2>
+  <p>Scan your network for unknown devices</p>
+</div>
+
+<div class="scan-section">
+  <button onclick="triggerScan()" class="btn-primary" id="scan-btn">
+    🔍 Scan Now
+  </button>
+  <div class="progress-bar hidden" id="progress-bar">
+    <div class="progress-fill" id="progress-fill"></div>
+  </div>
+  <p class="feedback" id="scan-feedback"></p>
+</div>
+
+<!-- Scan Results -->
+<div id="scan-results" class="hidden">
+  <h3>⚠️ Unknown Devices Found</h3>
+  <table>
+    <thead>
+      <tr>
+        <th>IP Address</th>
+        <th>MAC Address</th>
+        <th>Vendor</th>
+        <th>Device Name</th>
+        <th>Actions</th>
+      </tr>
+    </thead>
+    <tbody id="results-table"></tbody>
+  </table>
+</div>
+
+<script>
+  function triggerScan() {
+    const btn = document.getElementById("scan-btn");
+    const bar = document.getElementById("progress-bar");
+    const fill = document.getElementById("progress-fill");
+    const feedback = document.getElementById("scan-feedback");
+    const results = document.getElementById("scan-results");
+
+    btn.disabled = true;
+    btn.textContent = "Scanning...";
+    bar.classList.remove("hidden");
+    fill.style.width = "0%";
+    feedback.textContent = "";
+    results.classList.add("hidden");
+
+    let progress = 0;
+    const progressInterval = setInterval(() => {
+      progress += 1;
+      if (progress <= 90) fill.style.width = progress + "%";
+    }, 600);
+
+    fetch("/api/scan", { method: "POST" })
+      .then((r) => r.json())
+      .then((data) => {
+        if (data.status !== "success") {
+          clearInterval(progressInterval);
+          bar.classList.add("hidden");
+          btn.disabled = false;
+          btn.textContent = "🔍 Scan Now";
+          feedback.textContent = "⚠️ " + data.message;
+          return;
+        }
+        const pollInterval = setInterval(() => {
+          fetch("/api/scan/status")
+            .then((r) => r.json())
+            .then((status) => {
+              if (!status.in_progress) {
+                clearInterval(pollInterval);
+                clearInterval(progressInterval);
+                fill.style.width = "100%";
+                setTimeout(() => {
+                  bar.classList.add("hidden");
+                  btn.disabled = false;
+                  btn.textContent = "🔍 Scan Now";
+                  if (status.unknown && status.unknown.length > 0) {
+                    feedback.textContent = `⚠️ ${status.unknown.length} unknown device(s) found!`;
+                    showResults(status.unknown);
+                  } else {
+                    feedback.textContent =
+                      "✅ Scan complete! All devices recognized.";
+                  }
+                }, 500);
+              }
+            });
+        }, 2000);
+      });
+  }
+
+  function showResults(unknown) {
+    const tbody = document.getElementById("results-table");
+    const results = document.getElementById("scan-results");
+    tbody.innerHTML = "";
+
+    unknown.forEach((device) => {
+      const row = document.createElement("tr");
+      row.id = "result-" + device.mac.replace(/:/g, "-");
+      row.innerHTML = `
+      <td>${device.ip}</td>
+      <td>${device.mac}</td>
+      <td><input type="text" value="${device.vendor}" id="vendor-${device.mac.replace(/:/g, "-")}"></td>
+      <td><input type="text" placeholder="Device name" id="name-${device.mac.replace(/:/g, "-")}"></td>
+      <td>
+        <button onclick="addToWhitelist('${device.mac}', '${device.ip}', '${device.hostname}')"
+          class="btn-small btn-primary">Add to Whitelist</button>
+      </td>
+    `;
+      tbody.appendChild(row);
+    });
+
+    results.classList.remove("hidden");
+  }
+
+  function addToWhitelist(mac, ip, hostname) {
+    const safeMac = mac.replace(/:/g, "-");
+    const vendor = document.getElementById("vendor-" + safeMac).value;
+    const device_name = document.getElementById("name-" + safeMac).value;
+
+    fetch("/api/whitelist/add", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ mac, ip, hostname, vendor, device_name }),
+    })
+      .then((r) => r.json())
+      .then((data) => {
+        if (data.status === "success") {
+          document.getElementById("result-" + safeMac).remove();
+          location.reload();
+        }
+      });
+  }
+
+  function editDevice(mac) {
+    const row = document.getElementById("row-" + mac.replace(/:/g, "-"));
+    document.getElementById("edit-mac").value = mac;
+    document.getElementById("edit-vendor").value =
+      row.querySelector(".vendor-cell").textContent;
+    document.getElementById("edit-device-name").value =
+      row.querySelector(".name-cell").textContent;
+    document.getElementById("edit-modal").classList.remove("hidden");
+  }
+
+  function closeModal() {
+    document.getElementById("edit-modal").classList.add("hidden");
+  }
+
+  function saveEdit() {
+    const mac = document.getElementById("edit-mac").value;
+    const vendor = document.getElementById("edit-vendor").value;
+    const device_name = document.getElementById("edit-device-name").value;
+
+    fetch("/api/whitelist/edit", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ mac, vendor, device_name }),
+    })
+      .then((r) => r.json())
+      .then((data) => {
+        if (data.status === "success") {
+          closeModal();
+          location.reload();
+        }
+      });
+  }
+
+  function flagDevice(mac) {
+    if (confirm("Move this device to flagged?")) {
+      fetch("/api/whitelist/flag", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ mac }),
+      })
+        .then((r) => r.json())
+        .then((data) => {
+          if (data.status === "success") location.reload();
+        });
+    }
+  }
+
+  function removeDevice(mac) {
+    if (confirm("Remove this device from your whitelist?")) {
+      fetch("/api/whitelist/remove", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ mac }),
+      })
+        .then((r) => r.json())
+        .then((data) => {
+          if (data.status === "success") location.reload();
+        });
+    }
+  }
+</script>
+{% endblock %}

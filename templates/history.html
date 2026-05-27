@@ -1,0 +1,18 @@
+{% extends "base.html" %} {% block content %}
+<div class="page-header">
+  <h2>📜 Scan History</h2>
+  <p>A log of all network scans and detected events</p>
+</div>
+
+<div class="log-container">
+  {% if logs %} {% for line in logs %}
+  <div class="log-entry {{ 'log-alert' if '⚠️' in line else 'log-clean' }}">
+    {{ line }}
+  </div>
+  {% endfor %} {% else %}
+  <p class="empty-state">
+    No scan history yet. Run the scanner to get started.
+  </p>
+  {% endif %}
+</div>
+{% endblock %}

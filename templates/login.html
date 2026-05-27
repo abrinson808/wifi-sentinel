@@ -1,0 +1,15 @@
+{% extends "base.html" %} {% block content %}
+<div class="login-container">
+  <h1>🛡️ WiFi Sentinel</h1>
+  <p>Enter your password to access the dashboard</p>
+
+  {% if error %}
+  <p class="error">{{ error }}</p>
+  {% endif %}
+
+  <form method="POST">
+    <input type="password" name="password" placeholder="Password" autofocus />
+    <button type="submit">Login</button>
+  </form>
+</div>
+{% endblock %}

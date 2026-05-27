@@ -1,0 +1,95 @@
+{% extends "base.html" %} {% block content %}
+<div class="page-header">
+  <h2>⚙️ Settings</h2>
+  <p>Control your WiFi Sentinel from the dashboard</p>
+</div>
+
+<div class="settings-section">
+  <h3>🔍 Manual Scan</h3>
+  <p>Trigger a network scan right now</p>
+  <button onclick="triggerScan()" class="btn-primary">Run Scan Now</button>
+  <p class="feedback" id="scan-feedback"></p>
+</div>
+
+<div class="settings-section">
+  <h3>⏰ Scheduler</h3>
+  <p>
+    Status:
+    <span id="scheduler-status"
+      >{{ 'Running' if scheduler_running else 'Stopped' }}</span
+    >
+  </p>
+  <button onclick="startScheduler()" class="btn-primary">
+    Start Scheduler
+  </button>
+  <button onclick="stopScheduler()" class="btn-danger">Stop Scheduler</button>
+
+  <div class="interval-control">
+    <label>Scan interval (minutes):</label>
+    <input
+      type="number"
+      id="interval-input"
+      value="{{ scan_interval }}"
+      min="1"
+      max="60"
+    />
+    <button onclick="updateInterval()" class="btn-primary">Save</button>
+    <p class="feedback" id="interval-feedback"></p>
+  </div>
+</div>
+
+<div class="settings-section">
+  <h3>🔔 Notifications</h3>
+  <p>
+    Desktop notifications are currently
+    <strong>{{ 'enabled' if notifications_enabled else 'disabled' }}</strong>
+  </p>
+</div>
+
+<script>
+  function triggerScan() {
+    fetch("/api/scan", { method: "POST" })
+      .then((r) => r.json())
+      .then((data) => {
+        document.getElementById("scan-feedback").textContent =
+          data.status === "success" ? "✅ Scan started!" : "⚠️ " + data.message;
+      });
+  }
+
+  function startScheduler() {
+    fetch("/api/scheduler/start", { method: "POST" })
+      .then((r) => r.json())
+      .then((data) => {
+        document.getElementById("scheduler-status").textContent = data.running
+          ? "Running"
+          : "Stopped";
+      });
+  }
+
+  function stopScheduler() {
+    fetch("/api/scheduler/stop", { method: "POST" })
+      .then((r) => r.json())
+      .then((data) => {
+        document.getElementById("scheduler-status").textContent = data.running
+          ? "Running"
+          : "Stopped";
+      });
+  }
+
+  function updateInterval() {
+    const interval = document.getElementById("interval-input").value;
+    fetch("/api/interval", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ interval: interval }),
+    })
+      .then((r) => r.json())
+      .then((data) => {
+        document.getElementById("interval-feedback").textContent =
+          data.status === "success"
+            ? "✅ Interval updated!"
+            : "⚠️ " + data.message;
+      });
+  }
+</script>
+{% endblock %}
